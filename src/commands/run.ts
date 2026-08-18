@@ -6,6 +6,7 @@ import { planWorkflow } from "../planner/generate.js";
 import { createProgressSink } from "../progress.js";
 import { executeWorkflow } from "../runtime/execute.js";
 import { Journal } from "../runtime/journal.js";
+import { spawnDetachedResume } from "../runtime/detach.js";
 import { parseRunFlags } from "../cli/flags.js";
 import { RUN_HELP } from "./help.js";
 import { runFile } from "../store/paths.js";
@@ -19,7 +20,11 @@ export interface CommandIo {
   stderr: { write(chunk: string): unknown; isTTY?: boolean };
 }
 
-export async function runCommand(argv: string[], io: CommandIo = process): Promise<number> {
+export async function runCommand(
+  argv: string[],
+  io: CommandIo = process,
+  hooks: { spawnResume?: typeof spawnDetachedResume } = {},
+): Promise<number> {
   const flags = parseRunFlags(argv);
   if (flags.help) {
     io.stdout.write(`${RUN_HELP}\n`);
@@ -119,6 +124,28 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
 
   if (flags.backend !== "fake") {
     requireApiKey(flags.backend);
+  }
+
+  if (flags.detach) {
+    await updateRun(cwd, runId, { status: "pending", workflowPath, pid: undefined });
+    try {
+      const logPath = runFile(cwd, runId, "runtime.log");
+      const spawned = (hooks.spawnResume ?? spawnDetachedResume)({
+        cwd,
+        runId,
+        output: flags.output,
+        logPath,
+      });
+      await updateRun(cwd, runId, { pid: spawned.pid });
+    } catch (error) {
+      await updateRun(cwd, runId, {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    io.stderr.write(`run: ${runId}\nworkflow: ${workflowPath}\n`);
+    return 0;
   }
 
   return executeExistingRun({

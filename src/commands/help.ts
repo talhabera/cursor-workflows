@@ -28,6 +28,7 @@ Options:
   --workflow <name>       Load .cursor/workflows/<name>.js (project wins over user)
   --args <json>           Structured input exposed as \`args\` in the script
   --dry-run               Write/print the script and exit without executing
+  --detach                Execute the workflow in the background
   --yes                   Execute a planner-generated script without a second confirmation
   --save                  After a successful run, copy the script to .cursor/workflows/
   --backend <sdk|cli|fake>
@@ -46,6 +47,7 @@ Examples:
   cw run --file examples/audit-routes.js --backend fake --yes
   cw run --workflow audit-routes --args '{"dir":"src/routes"}'
   cw run "migrate styled-components to Tailwind" --dry-run
+  cw run --file .cursor/workflows/audit-routes.js --detach
 `;
 
 export const WORKFLOWS_HELP = `cw workflows — saved workflow scripts
