@@ -1,0 +1,46 @@
+{
+  "name": "cursor-workflows",
+  "version": "0.1.0",
+  "description": "Ultracode-style workflow CLI for Cursor: a planner writes a JS script, a runtime fans work out across Cursor agents.",
+  "type": "module",
+  "bin": {
+    "cw": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/planner/prompts"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc && mkdir -p dist/planner/prompts && cp src/planner/prompts/generate-workflow.md dist/planner/prompts/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cw": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "cursor",
+    "cli",
+    "agents",
+    "workflows"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@cursor/sdk": "^1.0.6",
+    "ajv": "^8.17.1",
+    "execa": "^9.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
