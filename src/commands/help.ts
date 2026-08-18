@@ -4,6 +4,7 @@ Usage:
   cw <command> [options]
 
 Commands:
+  chat        Start an interactive Cursor agent session
   run         Generate and/or execute a workflow
   workflows   List or save reusable workflow scripts
   status      Show a run
@@ -12,10 +13,26 @@ Commands:
   help        Show help for a command
 
 Examples:
+  cw
+  cw chat
   cw run "audit every route under src/routes for missing auth" --yes
   cw run --file .cursor/workflows/audit-routes.js
   cw workflows list
   cw status --run cw_k1_ab12
+`;
+
+export const CHAT_HELP = `cw chat — start an interactive Cursor agent session
+
+Usage:
+  cw chat [agent-options...]
+
+Options:
+  -h, --help              Show this help
+
+Examples:
+  cw
+  cw chat
+  cw chat --model composer-2.5
 `;
 
 export const RUN_HELP = `cw run — generate and execute a workflow

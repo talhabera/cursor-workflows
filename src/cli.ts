@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { chatCommand } from "./commands/chat.js";
-import { ROOT_HELP } from "./commands/help.js";
+import { CHAT_HELP, ROOT_HELP } from "./commands/help.js";
 import { resumeCommand } from "./commands/resume.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
@@ -31,6 +31,10 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     return startChat([]);
   }
   if (command === "help") {
+    if (rest[0] === "chat") {
+      io.stdout.write(`${CHAT_HELP}\n`);
+      return 0;
+    }
     if (rest[0]) {
       return dispatch(rest[0], ["--help"]);
     }
@@ -38,6 +42,10 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     return 0;
   }
   if (command === "chat") {
+    if (rest[0] === "-h" || rest[0] === "--help") {
+      io.stdout.write(`${CHAT_HELP}\n`);
+      return 0;
+    }
     return startChat(rest);
   }
   return dispatch(command, rest);

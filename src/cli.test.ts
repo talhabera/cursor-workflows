@@ -58,4 +58,25 @@ describe("runCli", () => {
     expect(chat).toBe(0);
     expect(stdout.text()).toContain("Commands:");
   });
+
+  for (const argv of [["chat", "-h"], ["chat", "--help"], ["help", "chat"]]) {
+    it(`prints chat help without starting chat for ${argv.join(" ")}`, async () => {
+      let chat = 0;
+      const stdout = memoryStream();
+      const code = await runCli(argv, {
+        stdout: stdout.stream,
+        stderr: stdout.stream,
+        stdinIsTTY: true,
+        chat: async () => {
+          chat += 1;
+          return 0;
+        },
+      });
+      expect(code).toBe(0);
+      expect(chat).toBe(0);
+      expect(stdout.text()).toContain("cw chat");
+      expect(stdout.text()).toContain("Examples:");
+      expect(stdout.text()).toContain("  cw");
+    });
+  }
 });
