@@ -17,6 +17,7 @@ export interface RunFlags {
   dryRun: boolean;
   yes: boolean;
   save: boolean;
+  detach: boolean;
   backend: WorkerBackendName;
   cwd: string;
   model: string | undefined;
@@ -34,6 +35,8 @@ export interface IdFlags {
   yes: boolean;
   name: string | undefined;
   user: boolean;
+  phase: string | undefined;
+  label: string | undefined;
 }
 
 export function parseRunFlags(args: string[]): RunFlags {
@@ -47,7 +50,8 @@ export function parseRunFlags(args: string[]): RunFlags {
       "dry-run": { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
       save: { type: "boolean", default: false },
-      backend: { type: "string", default: "sdk" },
+      detach: { type: "boolean", default: false },
+      backend: { type: "string", default: "cli" },
       cwd: { type: "string" },
       model: { type: "string" },
       size: { type: "string", default: "medium" },
@@ -58,10 +62,10 @@ export function parseRunFlags(args: string[]): RunFlags {
     },
   });
 
-  const backendRaw = values.backend ?? "sdk";
+  const backendRaw = values.backend ?? "cli";
   if (!isWorkerBackendName(backendRaw)) {
     throw new CliError(`unknown backend: ${backendRaw}`, {
-      example: "cw run --backend sdk --file workflow.js --yes",
+      example: "cw run --backend cli --file workflow.js --yes",
     });
   }
   const sizeRaw = values.size ?? "medium";
@@ -85,6 +89,7 @@ export function parseRunFlags(args: string[]): RunFlags {
     dryRun: values["dry-run"] === true,
     yes: values.yes === true,
     save: values.save === true,
+    detach: values.detach === true,
     backend: backendRaw,
     cwd: values.cwd ?? process.cwd(),
     model: values.model,
@@ -118,6 +123,8 @@ export function parseIdFlags(args: string[]): IdFlags {
       yes: { type: "boolean", default: false },
       name: { type: "string" },
       user: { type: "boolean", default: false },
+      phase: { type: "string" },
+      label: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -134,6 +141,8 @@ export function parseIdFlags(args: string[]): IdFlags {
     yes: values.yes === true,
     name: values.name,
     user: values.user === true,
+    phase: values.phase,
+    label: values.label,
   };
 }
 

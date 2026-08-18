@@ -37,6 +37,7 @@ export interface WorkerRequest {
   phase: string | undefined;
   isolation: IsolationMode;
   signal: AbortSignal;
+  cliMode?: "ask" | "plan";
 }
 
 export interface WorkerResult {
@@ -74,6 +75,8 @@ export interface RunRecord {
   updatedAt: string;
   pid: number | undefined;
   stopRequested: boolean;
+  cancelPhases: string[];
+  cancelLabels: string[];
   workflowPath: string;
   prompt: string | undefined;
   args: unknown;

@@ -51,6 +51,8 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
     updatedAt: createdAt,
     pid: process.pid,
     stopRequested: false,
+    cancelPhases: [],
+    cancelLabels: [],
     workflowPath: runFile(cwd, runId, "workflow.js"),
     prompt: flags.prompt,
     args: flags.args,
