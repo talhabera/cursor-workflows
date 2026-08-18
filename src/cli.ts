@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { chatCommand } from "./commands/chat.js";
 import { ROOT_HELP } from "./commands/help.js";
 import { resumeCommand } from "./commands/resume.js";
 import { runCommand } from "./commands/run.js";
@@ -7,18 +8,37 @@ import { stopCommand } from "./commands/stop.js";
 import { workflowsCommand } from "./commands/workflows.js";
 import { CliError, formatCliError } from "./errors.js";
 
-export async function runCli(argv: string[]): Promise<number> {
+export interface CliIo {
+  stdout: { write(chunk: string): unknown };
+  stderr: { write(chunk: string): unknown };
+  stdinIsTTY?: boolean;
+  chat?: (argv: string[]) => Promise<number>;
+}
+
+export async function runCli(argv: string[], io: CliIo = process): Promise<number> {
+  const stdinIsTTY = io.stdinIsTTY ?? Boolean(process.stdin.isTTY);
+  const startChat = io.chat ?? ((rest: string[]) => chatCommand(rest));
   const [command, ...rest] = argv;
-  if (!command || command === "-h" || command === "--help") {
-    process.stdout.write(`${ROOT_HELP}\n`);
+  if (command === "-h" || command === "--help") {
+    io.stdout.write(`${ROOT_HELP}\n`);
     return 0;
+  }
+  if (!command) {
+    if (!stdinIsTTY) {
+      io.stdout.write(`${ROOT_HELP}\n`);
+      return 0;
+    }
+    return startChat([]);
   }
   if (command === "help") {
     if (rest[0]) {
       return dispatch(rest[0], ["--help"]);
     }
-    process.stdout.write(`${ROOT_HELP}\n`);
+    io.stdout.write(`${ROOT_HELP}\n`);
     return 0;
+  }
+  if (command === "chat") {
+    return startChat(rest);
   }
   return dispatch(command, rest);
 }
