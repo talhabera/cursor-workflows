@@ -46,9 +46,14 @@ return out
 
     const statusOut = memoryStream();
     await statusCommand(["--output", "json"], { stdout: statusOut.stream, stderr: stderr.stream }, cwd);
-    const status = JSON.parse(statusOut.text()) as { status: string; backend: string };
-    expect(status.status).toBe("completed");
-    expect(status.backend).toBe("fake");
+    const status = JSON.parse(statusOut.text()) as {
+      run: { status: string; backend: string };
+      journal: Array<{ key: string }>;
+      events: unknown[];
+    };
+    expect(status.run.status).toBe("completed");
+    expect(status.run.backend).toBe("fake");
+    expect(status.journal.length).toBeGreaterThan(0);
 
     const listOut = memoryStream();
     await workflowsCommand(["list"], { stdout: listOut.stream, stderr: stderr.stream }, cwd);
