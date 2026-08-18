@@ -24,5 +24,5 @@ export function userWorkflowsDir(home: string = homedir()): string {
 }
 
 export function bundledPluginDir(from: string = import.meta.url): string {
-  return path.resolve(path.dirname(fileURLToPath(from)), "../plugin");
+  return path.resolve(path.dirname(fileURLToPath(from)), "../../plugin");
 }
