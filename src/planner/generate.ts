@@ -32,7 +32,7 @@ export async function planWorkflow(options: PlanWorkflowOptions): Promise<string
     model: options.model ?? DEFAULT_MODEL,
     tools: "read",
     cliMode: "plan",
-    schema: PLANNER_SOURCE_SCHEMA,
+    schema: undefined,
     label: "planner",
     phase: "plan",
     isolation: "cwd",
