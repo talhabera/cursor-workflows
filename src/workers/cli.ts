@@ -61,12 +61,15 @@ export class CliWorkerBackend implements WorkerBackend {
           example: "agent login\n  Available: install Cursor Agent and ensure `agent` is on PATH (or set CW_AGENT_BIN)",
         });
       }
-      if (/not logged in|unauthorized|login/i.test(String(error))) {
+      const stderr = typeof (error as { stderr?: unknown }).stderr === "string"
+        ? (error as { stderr: string }).stderr
+        : "";
+      if (/not logged in|unauthorized|run ['"`]?agent login/i.test(stderr)) {
         throw new CliError("agent CLI is not logged in", { example: "agent login" });
       }
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError(`cursor CLI worker failed: ${message}`, {
-        example: "agent -p --trust --output-format json --workspace <cwd> \"<prompt>\"",
+        example: "agent -p --trust --approve-mcps --output-format json --workspace <cwd> --mode ask \"<prompt>\"",
       });
     }
   }
