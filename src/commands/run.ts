@@ -73,9 +73,7 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
     } else if (flags.workflow) {
       source = await loadWorkflowByName(cwd, flags.workflow);
     } else {
-      if (flags.backend !== "fake") {
-        requireApiKey("sdk");
-      }
+      requireApiKey(flags.backend);
       if (!flags.prompt) {
         throw new CliError("planner requires a prompt", {
           example: 'cw run "audit src/routes for missing auth" --yes',

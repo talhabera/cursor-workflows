@@ -23,12 +23,12 @@ export function createWorkerBackend(name: WorkerBackendName): WorkerBackend {
 }
 
 export function requireApiKey(backend: WorkerBackendName): void {
-  if (backend === "fake") {
+  if (backend !== "sdk") {
     return;
   }
   if (!process.env.CURSOR_API_KEY?.trim()) {
     throw new CliError("CURSOR_API_KEY is not set", {
-      example: 'export CURSOR_API_KEY="cursor_..." && cw run --file workflow.js --yes',
+      example: 'export CURSOR_API_KEY="cursor_..." && cw run --backend sdk --file workflow.js --yes',
     });
   }
 }
