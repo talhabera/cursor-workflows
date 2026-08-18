@@ -80,13 +80,12 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
         });
       }
       await updateRun(cwd, runId, { status: "planning" });
-      const apiKey = process.env.CURSOR_API_KEY?.trim() ?? "";
       source = await planWorkflow({
         task: flags.prompt,
         cwd,
         model: flags.model,
         size: flags.size,
-        apiKey,
+        backend: createWorkerBackend(flags.backend),
       });
     }
   } catch (error) {
