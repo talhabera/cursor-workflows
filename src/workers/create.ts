@@ -16,7 +16,10 @@ export function createWorkerBackend(name: WorkerBackendName): WorkerBackend {
         defaultModel: DEFAULT_MODEL,
       });
     case "cli":
-      return new CliWorkerBackend({ defaultModel: DEFAULT_MODEL });
+      return new CliWorkerBackend({
+        defaultModel: DEFAULT_MODEL,
+        agentBin: process.env.CW_AGENT_BIN?.trim() || undefined,
+      });
     default:
       return assertNever(name);
   }

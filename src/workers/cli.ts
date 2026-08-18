@@ -2,6 +2,7 @@ import { execa } from "execa";
 import { CliError } from "../errors.js";
 import type { WorkerBackend, WorkerRequest, WorkerResult } from "../types.js";
 import { validateJsonSchema } from "../runtime/schema.js";
+import { buildCliAgentArgs } from "./cli-args.js";
 
 export class CliWorkerBackend implements WorkerBackend {
   readonly name = "cli" as const;
@@ -13,24 +14,8 @@ export class CliWorkerBackend implements WorkerBackend {
   ) {}
 
   async start(request: WorkerRequest): Promise<WorkerResult> {
-    const bin = this.options.agentBin ?? "agent";
-    const args = [
-      "-p",
-      "--trust",
-      "--output-format",
-      "json",
-      "--workspace",
-      request.cwd,
-      "--model",
-      request.model || this.options.defaultModel,
-    ];
-    if (request.tools === "write" || request.tools === "full") {
-      args.push("--force");
-    }
-    const prompt = request.schema
-      ? `${request.prompt}\n\nReply with JSON only matching this schema:\n${JSON.stringify(request.schema)}`
-      : request.prompt;
-    args.push(prompt);
+    const bin = (this.options.agentBin ?? process.env.CW_AGENT_BIN?.trim()) || "agent";
+    const args = buildCliAgentArgs(request, this.options.defaultModel);
 
     try {
       const { stdout } = await execa(bin, args, {
@@ -70,6 +55,14 @@ export class CliWorkerBackend implements WorkerBackend {
           transcriptPath: undefined,
           status: "cancelled",
         };
+      }
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new CliError("agent CLI not found", {
+          example: "agent login\n  Available: install Cursor Agent and ensure `agent` is on PATH (or set CW_AGENT_BIN)",
+        });
+      }
+      if (/not logged in|unauthorized|login/i.test(String(error))) {
+        throw new CliError("agent CLI is not logged in", { example: "agent login" });
       }
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError(`cursor CLI worker failed: ${message}`, {
