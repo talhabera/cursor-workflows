@@ -23,7 +23,7 @@ export async function stopCommand(
     throw new CliError("no runs found", { example: "cw stop --run <id>" });
   }
 
-  const selective = Boolean(flags.phase || flags.label);
+  const selective = flags.phase !== undefined || flags.label !== undefined;
   if (!selective) {
     const record = await updateRun(cwd, runId, { stopRequested: true });
     if (record.pid) {

@@ -134,6 +134,8 @@ export function parseIdFlags(args: string[]): IdFlags {
       example: "cw status --output json",
     });
   }
+  assertNonEmptySelector("--phase", values.phase);
+  assertNonEmptySelector("--label", values.label);
   return {
     runId: values.run,
     output: outputRaw,
@@ -144,6 +146,14 @@ export function parseIdFlags(args: string[]): IdFlags {
     phase: values.phase,
     label: values.label,
   };
+}
+
+function assertNonEmptySelector(flag: "--phase" | "--label", value: string | undefined): void {
+  if (value !== undefined && value.trim() === "") {
+    throw new CliError(`${flag} must not be empty`, {
+      example: "cw stop --run <id> --phase verify",
+    });
+  }
 }
 
 function parseArgsJson(raw: string | undefined): unknown {

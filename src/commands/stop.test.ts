@@ -4,6 +4,7 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stopCommand } from "./stop.js";
+import { CliError } from "../errors.js";
 import { writeRun } from "../store/runs.js";
 import { runFile } from "../store/paths.js";
 import type { RunRecord } from "../types.js";
@@ -129,6 +130,20 @@ describe("stopCommand", () => {
         const raw = JSON.parse(await readFile(runFile(cwd, id, "run.json"), "utf8")) as RunRecord;
         expect(raw.cancelLabels).toEqual(["worker-a"]);
         expect(killSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    it("rejects an empty --phase instead of escalating to a whole-run stop", async () => {
+      await withTempDir(async (cwd) => {
+        const id = "cw_stop_5";
+        await writeRun(cwd, record(cwd, id));
+        const stdout = memoryStream();
+        await expect(
+          stopCommand(["--run", id, "--phase", ""], { stdout: stdout.stream, stderr: stdout.stream }, cwd),
+        ).rejects.toBeInstanceOf(CliError);
+        expect(killSpy).not.toHaveBeenCalled();
+        const raw = JSON.parse(await readFile(runFile(cwd, id, "run.json"), "utf8")) as RunRecord;
+        expect(raw.stopRequested).toBe(false);
       });
     });
   });

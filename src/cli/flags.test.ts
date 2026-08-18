@@ -38,4 +38,24 @@ describe("parseIdFlags", () => {
     expect(flags.phase).toBe("verify");
     expect(flags.label).toBe("src/a.ts");
   });
+
+  it("rejects an empty --phase value instead of silently treating it as whole-run", () => {
+    try {
+      parseIdFlags(["--run", "cw_1", "--phase", ""]);
+      throw new Error("expected CliError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliError);
+      expect((error as CliError).example).toContain("cw stop --run <id> --phase verify");
+    }
+  });
+
+  it("rejects a whitespace-only --label value", () => {
+    try {
+      parseIdFlags(["--run", "cw_1", "--label", "   "]);
+      throw new Error("expected CliError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliError);
+      expect((error as CliError).example).toContain("cw stop --run <id> --phase verify");
+    }
+  });
 });
