@@ -72,10 +72,12 @@ Examples:
 export const STOP_HELP = `cw stop — request stop for a running workflow
 
 Usage:
-  cw stop [--run <id>]
+  cw stop [--run <id>] [--phase <name>] [--label <label>]
 
 Examples:
   cw stop --run cw_k1_ab12
+  cw stop --run cw_k1_ab12 --phase verify
+  cw stop --run cw_k1_ab12 --label src/routes/a.ts
 `;
 
 export const RESUME_HELP = `cw resume — replay completed agent() calls and continue the rest
