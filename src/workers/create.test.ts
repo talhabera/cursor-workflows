@@ -29,4 +29,15 @@ describe("requireApiKey", () => {
       expect((error as CliError).example).toContain("CURSOR_API_KEY");
     }
   });
+
+  it("rejects whitespace-only CURSOR_API_KEY for sdk", () => {
+    process.env.CURSOR_API_KEY = "   ";
+    try {
+      requireApiKey("sdk");
+      throw new Error("expected CliError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliError);
+      expect((error as CliError).example).toContain("CURSOR_API_KEY");
+    }
+  });
 });
