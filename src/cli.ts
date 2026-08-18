@@ -42,7 +42,7 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     return 0;
   }
   if (command === "chat") {
-    if (rest[0] === "-h" || rest[0] === "--help" || rest[0] === "help") {
+    if (rest.some((arg) => arg === "-h" || arg === "--help" || arg === "help")) {
       io.stdout.write(`${CHAT_HELP}\n`);
       return 0;
     }
