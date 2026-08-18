@@ -27,7 +27,9 @@ export async function chatCommand(argv: string[], hooks: ChatHooks = {}): Promis
     ...argv,
   ];
   try {
-    const exec = hooks.exec ?? ((file, execArgs, options) => execa(file, execArgs, options));
+    const exec =
+      hooks.exec ??
+      ((file, execArgs, options) => execa(file, execArgs, { ...options, reject: false }));
     const result = await exec(bin, args, { cwd, stdio: "inherit" });
     return result.exitCode ?? 0;
   } catch (error) {

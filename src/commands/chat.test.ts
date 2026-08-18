@@ -28,4 +28,11 @@ describe("chatCommand", () => {
     ]);
     expect(call.options.stdio).toBe("inherit");
   });
+
+  it("returns agent non-zero exit codes without throwing", async () => {
+    const code = await chatCommand([], {
+      exec: async () => ({ exitCode: 2 }),
+    });
+    expect(code).toBe(2);
+  });
 });

@@ -59,7 +59,7 @@ describe("runCli", () => {
     expect(stdout.text()).toContain("Commands:");
   });
 
-  for (const argv of [["chat", "-h"], ["chat", "--help"], ["help", "chat"]]) {
+  for (const argv of [["chat", "-h"], ["chat", "--help"], ["chat", "help"], ["help", "chat"]]) {
     it(`prints chat help without starting chat for ${argv.join(" ")}`, async () => {
       let chat = 0;
       const stdout = memoryStream();
