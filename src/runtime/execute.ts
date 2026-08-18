@@ -33,6 +33,7 @@ export interface ExecuteWorkflowOptions {
   progress: ProgressSink;
   persistJournal?: () => Promise<void>;
   shouldStop?: () => Promise<boolean> | boolean;
+  shouldCancel?: (call: { phase?: string; label?: string }) => Promise<boolean> | boolean;
   now?: () => string;
 }
 
@@ -83,6 +84,34 @@ export async function executeWorkflow(
       return existing.result;
     }
 
+    if (await options.shouldCancel?.({ phase: callOptions.phase, label: callOptions.label })) {
+      callIndex += 1;
+      const cancelledIndex = callIndex;
+      const cancelledEntry: JournalEntry = {
+        callIndex: cancelledIndex,
+        key,
+        prompt,
+        label: callOptions.label,
+        phase: callOptions.phase,
+        status: "completed",
+        result: null,
+        tokens: 0,
+        workerId: undefined,
+      };
+      options.journal.upsert(cancelledEntry);
+      await options.persistJournal?.();
+      await emit({
+        type: "agent_end",
+        at: now(),
+        callIndex: cancelledIndex,
+        key,
+        ok: false,
+        tokens: 0,
+        phase: callOptions.phase,
+      });
+      return null;
+    }
+
     callIndex += 1;
     const thisIndex = callIndex;
     if (!warnedLarge && thisIndex === LARGE_RUN_AGENT_WARNING) {
@@ -119,6 +148,24 @@ export async function executeWorkflow(
 
     await semaphore.acquire();
     let cwd = callOptions.cwd ?? options.cwd;
+    const callAbort = new AbortController();
+    if (options.signal.aborted) {
+      callAbort.abort();
+    }
+    const onParentAbort = (): void => callAbort.abort();
+    options.signal.addEventListener("abort", onParentAbort, { once: true });
+    const tick = async (): Promise<void> => {
+      if (options.signal.aborted || (await options.shouldStop?.())) {
+        callAbort.abort();
+        return;
+      }
+      if (await options.shouldCancel?.({ phase: callOptions.phase, label: callOptions.label })) {
+        callAbort.abort();
+      }
+    };
+    const poll = setInterval(() => {
+      void tick();
+    }, 200);
     try {
       if (isolation === "worktree") {
         worktreeIndex.value += 1;
@@ -139,8 +186,33 @@ export async function executeWorkflow(
         label: callOptions.label,
         phase: callOptions.phase,
         isolation,
-        signal: options.signal,
+        signal: callAbort.signal,
       });
+
+      if (callAbort.signal.aborted) {
+        if (options.signal.aborted || (await options.shouldStop?.())) {
+          throw new Error("workflow stopped");
+        }
+        const cancelledEntry: JournalEntry = {
+          ...running,
+          status: "completed",
+          result: null,
+          tokens: 0,
+          workerId: undefined,
+        };
+        options.journal.upsert(cancelledEntry);
+        await options.persistJournal?.();
+        await emit({
+          type: "agent_end",
+          at: now(),
+          callIndex: thisIndex,
+          key,
+          ok: false,
+          tokens: 0,
+          phase: callOptions.phase,
+        });
+        return null;
+      }
 
       let result: unknown = workerResult.result;
       if (workerResult.status !== "finished") {
@@ -196,6 +268,8 @@ export async function executeWorkflow(
       });
       return null;
     } finally {
+      clearInterval(poll);
+      options.signal.removeEventListener("abort", onParentAbort);
       semaphore.release();
     }
   };

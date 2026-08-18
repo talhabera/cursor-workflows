@@ -193,6 +193,19 @@ export async function executeExistingRun(options: {
           return false;
         }
       },
+      shouldCancel: async (call) => {
+        try {
+          const current = await readRun(options.cwd, options.runId);
+          const phases = current.cancelPhases ?? [];
+          const labels = current.cancelLabels ?? [];
+          return (
+            (call.phase !== undefined && phases.includes(call.phase)) ||
+            (call.label !== undefined && labels.includes(call.label))
+          );
+        } catch {
+          return false;
+        }
+      },
     });
 
     await journal.save(journalPath);
