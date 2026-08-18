@@ -45,11 +45,11 @@ Options:
   --workflow <name>       Load .cursor/workflows/<name>.js (project wins over user)
   --args <json>           Structured input exposed as \`args\` in the script
   --dry-run               Write/print the script and exit without executing
-  --detach                Execute the workflow in the background
+  --detach                Start the runtime in the background (cw resume --run <id>)
   --yes                   Execute a planner-generated script without a second confirmation
   --save                  After a successful run, copy the script to .cursor/workflows/
   --backend <sdk|cli|fake>
-                          Worker backend (default: sdk)
+                          Worker backend (default: cli)
   --cwd <path>            Workspace root (default: current directory)
   --model <id>            Default model for planner and workers
   --size <small|medium|large|unrestricted>
@@ -60,6 +60,7 @@ Options:
   -h, --help              Show this help
 
 Examples:
+  agent login && cw run --file workflow.js --detach
   cw run "audit every route under src/routes for missing auth" --yes
   cw run --file examples/audit-routes.js --backend fake --yes
   cw run --workflow audit-routes --args '{"dir":"src/routes"}'

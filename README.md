@@ -1,40 +1,26 @@
 # cursor-workflows (`cw`)
 
-Ultracode-style workflow CLI for Cursor. One planner agent writes a JavaScript workflow; a local runtime executes `agent()` / `pipeline()` / `parallel()` against Cursor workers. Intermediate results stay in script variables, not in the planner's context.
+Ultracode-style workflow CLI for Cursor. You chat with an orchestrator (`agent`); a JavaScript workflow runs in the background; `agent()` / `pipeline()` / `parallel()` fan work out to local Cursor workers. Intermediate results stay in script variables.
 
 ## Setup
 
 ```bash
 npm install
 npm run build
+agent login
 npx cw --help
 ```
 
-Auth uses the same key as the Cursor SDK and CLI:
+Default workers are your installed `agent` CLI (plugins, skills, MCP). There is no API key on this path.
 
 ```bash
-export CURSOR_API_KEY="cursor_..."
-```
-
-Create a user key at [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations). Team service-account keys also work.
-
-Default worker backend is the local `@cursor/sdk`. Pass `--backend cli` to spawn `agent -p` instead.
-
-## Examples
-
-```bash
+cw                   # interactive orchestrator (TTY)
 cw run "audit every route under src/routes for missing auth" --yes
-cw run --file .cursor/workflows/audit-routes.js
-cw run --workflow audit-routes --args '{"dir":"src/routes"}'
-cw run --file examples/audit-routes.js --backend fake --yes
-cw run "migrate styled-components to Tailwind" --dry-run
-cw workflows list
-cw status --run <id>
-cw stop --run <id>
-cw resume --run <id>
 ```
 
-Without `--yes`, a planner-generated script is printed and execution is refused (non-interactive). `--file` / `--workflow` / `resume` skip that gate.
+`--backend sdk` is optional and requires `CURSOR_API_KEY`. On `--backend cli`, `tools: "write"` and `"full"` both allow shell (`agent -p --force`).
+
+Chat during a run goes to the orchestrator, not into `workflow.js`. Use `cw status`, `cw stop --phase <name>`, and `cw resume`.
 
 ## Workflow scripts
 
