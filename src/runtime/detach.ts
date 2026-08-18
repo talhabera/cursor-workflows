@@ -15,18 +15,24 @@ export function spawnDetachedResume(options: {
   logPath: string;
   spawn?: SpawnFn;
   execPath?: string;
+  execArgv?: string[];
   scriptPath?: string;
   openLog?: (path: string) => number;
 }): { pid: number } {
   const execPath = options.execPath ?? process.execPath;
+  const execArgv = options.execArgv ?? process.execArgv;
   const scriptPath = options.scriptPath ?? process.argv[1] ?? "cw";
   const spawnImpl = options.spawn ?? (spawn as unknown as SpawnFn);
   const fd = (options.openLog ?? openSync)(options.logPath, "a");
-  const child = spawnImpl(execPath, [scriptPath, "resume", "--run", options.runId, "--output", options.output], {
-    cwd: options.cwd,
-    detached: true,
-    stdio: ["ignore", fd, fd],
-  });
+  const child = spawnImpl(
+    execPath,
+    [...execArgv, scriptPath, "resume", "--run", options.runId, "--output", options.output],
+    {
+      cwd: options.cwd,
+      detached: true,
+      stdio: ["ignore", fd, fd],
+    },
+  );
   child.unref();
   const pid = child.pid;
   if (pid === undefined) {

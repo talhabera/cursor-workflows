@@ -11,6 +11,7 @@ describe("spawnDetachedResume", () => {
       logPath: "/repo/.cursor-workflows/runs/cw_1/runtime.log",
       execPath: "/usr/bin/node",
       scriptPath: "/pkg/dist/cli.js",
+      execArgv: [],
       spawn: ((file, args, options) => {
         spawned.push({ file, args, options });
         return { pid: 4242, unref() {}, stdio: [] };
@@ -23,5 +24,35 @@ describe("spawnDetachedResume", () => {
     expect(call.args).toEqual(["/pkg/dist/cli.js", "resume", "--run", "cw_1", "--output", "json"]);
     expect(call.options.cwd).toBe("/repo");
     expect(call.options.detached).toBe(true);
+  });
+
+  it("prefixes the script path with provided exec arguments", () => {
+    const spawned: unknown[] = [];
+    spawnDetachedResume({
+      cwd: "/repo",
+      runId: "cw_1",
+      output: "text",
+      logPath: "/repo/.cursor-workflows/runs/cw_1/runtime.log",
+      execPath: "/usr/bin/node",
+      scriptPath: "/pkg/src/cli.ts",
+      execArgv: ["--import", "tsx"],
+      spawn: ((file, args, options) => {
+        spawned.push({ file, args, options });
+        return { pid: 4242, unref() {}, stdio: [] };
+      }) as never,
+      openLog: () => 3 as never,
+    });
+
+    const call = spawned[0] as { args: string[] };
+    expect(call.args).toEqual([
+      "--import",
+      "tsx",
+      "/pkg/src/cli.ts",
+      "resume",
+      "--run",
+      "cw_1",
+      "--output",
+      "text",
+    ]);
   });
 });

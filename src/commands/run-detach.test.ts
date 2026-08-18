@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
+import { CliError } from "../errors.js";
 import { runCommand } from "./run.js";
 
 function memoryStream(): { stream: PassThrough; text: () => string } {
@@ -15,6 +16,15 @@ function memoryStream(): { stream: PassThrough; text: () => string } {
 }
 
 describe("cw run --detach", () => {
+  it("rejects --save with --detach", async () => {
+    await expect(
+      runCommand(["--file", "wf.js", "--backend", "fake", "--yes", "--save", "--detach"]),
+    ).rejects.toMatchObject<CliError>({
+      message: "cannot use --save with --detach",
+      example: "cw workflows save --run <id>",
+    });
+  });
+
   it("ignores --detach on dry-run", async () => {
     const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
     const file = path.join(cwd, "wf.js");

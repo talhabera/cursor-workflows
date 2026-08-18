@@ -43,6 +43,11 @@ export async function runCommand(
       example: "cw run --file .cursor/workflows/audit-routes.js",
     });
   }
+  if (flags.save && flags.detach) {
+    throw new CliError("cannot use --save with --detach", {
+      example: "cw workflows save --run <id>",
+    });
+  }
 
   const runId = newRunId();
   const createdAt = new Date().toISOString();
