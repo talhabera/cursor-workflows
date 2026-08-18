@@ -140,6 +140,12 @@ export async function runCommand(
         runId,
         output: flags.output,
         logPath,
+        onError: (spawnError) => {
+          void updateRun(cwd, runId, {
+            status: "failed",
+            error: spawnError.message,
+          });
+        },
       });
       await updateRun(cwd, runId, { pid: spawned.pid });
     } catch (error) {
