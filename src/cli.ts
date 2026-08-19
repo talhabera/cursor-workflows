@@ -5,6 +5,7 @@ import { resumeCommand } from "./commands/resume.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
 import { stopCommand } from "./commands/stop.js";
+import { watchCommand } from "./commands/watch.js";
 import { workflowsCommand } from "./commands/workflows.js";
 import { CliError, formatCliError } from "./errors.js";
 
@@ -36,7 +37,7 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
       return 0;
     }
     if (rest[0]) {
-      return dispatch(rest[0], ["--help"]);
+      return dispatch(rest[0], ["--help"], io);
     }
     io.stdout.write(`${ROOT_HELP}\n`);
     return 0;
@@ -48,10 +49,10 @@ export async function runCli(argv: string[], io: CliIo = process): Promise<numbe
     }
     return startChat(rest);
   }
-  return dispatch(command, rest);
+  return dispatch(command, rest, io);
 }
 
-async function dispatch(command: string, rest: string[]): Promise<number> {
+async function dispatch(command: string, rest: string[], io: CliIo): Promise<number> {
   switch (command) {
     case "run":
       return runCommand(rest);
@@ -63,6 +64,8 @@ async function dispatch(command: string, rest: string[]): Promise<number> {
       return stopCommand(rest);
     case "resume":
       return resumeCommand(rest);
+    case "watch":
+      return watchCommand(rest, io);
     default:
       throw new CliError(`unknown command: ${command}`, {
         example: "cw run --file examples/audit-routes.js --yes",

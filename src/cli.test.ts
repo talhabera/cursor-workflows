@@ -85,4 +85,19 @@ describe("runCli", () => {
       expect(stdout.text()).toContain("  cw");
     });
   }
+
+  it("prints watch help for help watch and watch --help", async () => {
+    for (const argv of [["help", "watch"], ["watch", "--help"]]) {
+      const stdout = memoryStream();
+      const code = await runCli(argv, {
+        stdout: stdout.stream,
+        stderr: stdout.stream,
+        stdinIsTTY: false,
+        chat: async () => 0,
+      });
+      expect(code).toBe(0);
+      expect(stdout.text()).toContain("cw watch");
+      expect(stdout.text()).toContain("--timeout");
+    }
+  });
 });
