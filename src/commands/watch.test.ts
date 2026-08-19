@@ -5,9 +5,9 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { writeResult, writeRun } from "../store/runs.js";
 import { runFile } from "../store/paths.js";
-import { readWatchCursor } from "../store/watch-cursor.js";
+import { readWatchCursor, writeWatchCursor } from "../store/watch-cursor.js";
 import type { RunEvent, RunRecord } from "../types.js";
-import { watchCommand } from "./watch.js";
+import { selectWatchRun, watchCommand } from "./watch.js";
 
 function memoryStream(): { stream: PassThrough; text: () => string } {
   const stream = new PassThrough();
@@ -16,8 +16,13 @@ function memoryStream(): { stream: PassThrough; text: () => string } {
   return { stream, text: () => chunks.join("") };
 }
 
-function record(cwd: string, id: string, status: RunRecord["status"] = "running"): RunRecord {
-  const now = new Date().toISOString();
+function record(
+  cwd: string,
+  id: string,
+  status: RunRecord["status"] = "running",
+  createdAt?: string,
+): RunRecord {
+  const now = createdAt ?? new Date().toISOString();
   return {
     id,
     status,
@@ -164,5 +169,54 @@ describe("watchCommand", () => {
     const code = await watchCommand(["--help"], { stdout: stdout.stream, stderr: stdout.stream });
     expect(code).toBe(0);
     expect(stdout.text()).toContain("cw watch");
+  });
+});
+
+describe("selectWatchRun", () => {
+  it("returns undefined when there are no runs", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      expect(await selectWatchRun(cwd)).toBeUndefined();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers a running run over an older fully consumed completed run", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const consumed = "cw_old";
+      const active = "cw_new";
+      await writeRun(cwd, record(cwd, consumed, "completed", "2020-01-01T00:00:00.000Z"));
+      await writeEvents(cwd, consumed, [
+        { type: "agent_start", at: "t", callIndex: 1, key: "a", phase: "audit" },
+        { type: "agent_end", at: "t", callIndex: 1, key: "a", ok: true, tokens: 1, phase: "audit" },
+      ]);
+      await writeResult(cwd, consumed, { ok: true });
+      await writeWatchCursor(cwd, consumed, { phaseEnds: ["audit"], terminal: true });
+      await writeRun(cwd, record(cwd, active, "running", "2025-01-01T00:00:00.000Z"));
+      await writeEvents(cwd, active, [
+        { type: "agent_start", at: "t", callIndex: 1, key: "a", label: "a", phase: "audit" },
+      ]);
+      expect(await selectWatchRun(cwd, { isPidAlive: () => true })).toBe(active);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("selects a completed run with unconsumed phase_end when nothing is active", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const id = "cw_done";
+      await writeRun(cwd, record(cwd, id, "completed"));
+      await writeEvents(cwd, id, [
+        { type: "agent_start", at: "t", callIndex: 1, key: "a", phase: "audit" },
+        { type: "agent_end", at: "t", callIndex: 1, key: "a", ok: true, tokens: 1, phase: "audit" },
+      ]);
+      await writeResult(cwd, id, { ok: true });
+      expect(await selectWatchRun(cwd, { isPidAlive: () => false })).toBe(id);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
   });
 });
