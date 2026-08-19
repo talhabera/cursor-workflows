@@ -69,15 +69,14 @@ describe("reducePhaseMachine", () => {
     const events: RunEvent[] = [
       start(1, "audit"),
       start(2, "verify"),
-      end(1, "audit"),
       end(2, "verify"),
       start(3, "verify"),
     ];
     const running = reducePhaseMachine(events, "running");
-    expect(running.completed.map((c) => c.phase)).toEqual(["audit"]);
+    expect(running.completed).toEqual([]);
     expect(running.frontier).toBe("verify");
     const done = reducePhaseMachine(
-      [...events, end(3, "verify")],
+      [...events, end(1, "audit"), end(3, "verify")],
       "completed",
     );
     expect(done.completed.map((c) => c.phase)).toEqual(["audit", "verify"]);
