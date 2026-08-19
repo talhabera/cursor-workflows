@@ -20,7 +20,9 @@ cw run "audit every route under src/routes for missing auth" --yes
 
 `--backend sdk` is optional and requires `CURSOR_API_KEY`. On `--backend cli`, `tools: "write"` and `"full"` both allow shell (`agent -p --force`).
 
-Chat during a run goes to the orchestrator, not into `workflow.js`. Use `cw status`, `cw stop --phase <name>`, and `cw resume`.
+Chat during a run goes to the orchestrator, not into `workflow.js`. Use `cw status`, `cw stop --phase <name>`, `cw resume`, and `cw watch`.
+
+In a `cw` / `cw chat` session, a detached run posts a phase summary when each phase ends and a short heartbeat about every 5 minutes. Headless `cw run --detach` does not print those into chat; inspect with `cw status` or `cw watch`.
 
 ## Workflow scripts
 
