@@ -53,12 +53,7 @@ function isTerminalStatus(status: RunStatus): boolean {
 }
 
 function isActiveStatus(status: RunStatus): boolean {
-  return (
-    status === "pending" ||
-    status === "planning" ||
-    status === "running" ||
-    status === "awaiting_approval"
-  );
+  return status === "pending" || status === "planning" || status === "running";
 }
 
 export function reducePhaseMachine(events: RunEvent[], runStatus: RunStatus): PhaseMachineState {
@@ -94,13 +89,21 @@ export function reducePhaseMachine(events: RunEvent[], runStatus: RunStatus): Ph
     }
   };
 
+  const completeIdlePhases = (): void => {
+    if (startOrder.length < 2) {
+      return;
+    }
+    for (const phase of [...startOrder]) {
+      if (runningCount(phase) === 0) {
+        complete(phase);
+      }
+    }
+  };
+
   for (const event of events) {
     switch (event.type) {
       case "agent_start": {
         const phase = normalizePhase(event.phase);
-        if (frontier !== undefined && frontier !== phase && runningCount(frontier) === 0) {
-          complete(frontier);
-        }
         frontier = phase;
         inFlight.set(event.callIndex, {
           phase,
@@ -116,6 +119,7 @@ export function reducePhaseMachine(events: RunEvent[], runStatus: RunStatus): Ph
           wave.labels.push(event.label);
         }
         waves.set(phase, wave);
+        completeIdlePhases();
         break;
       }
       case "agent_end": {
@@ -125,11 +129,14 @@ export function reducePhaseMachine(events: RunEvent[], runStatus: RunStatus): Ph
         const wave = waves.get(phase) ?? emptyWave();
         if (event.ok) {
           wave.ok += 1;
+        } else if (event.cancelled === true) {
+          wave.cancelled += 1;
         } else {
           wave.failed += 1;
         }
         wave.tokens += event.tokens;
         waves.set(phase, wave);
+        completeIdlePhases();
         break;
       }
       case "status":
@@ -158,6 +165,9 @@ export function decideNotify(input: {
   pidAlive: boolean;
   timeoutElapsed: boolean;
 }): NotifyAction {
+  if (input.runStatus === "awaiting_approval") {
+    return { type: "idle" };
+  }
   const next = input.state.completed[input.cursor.phaseEnds.length];
   if (next) {
     return { type: "phase_end", completion: next };
@@ -167,6 +177,13 @@ export function decideNotify(input: {
   }
   if (isTerminalStatus(input.runStatus) && !input.cursor.terminal) {
     return { type: "terminal" };
+  }
+  if (
+    input.cursor.terminal &&
+    (isTerminalStatus(input.runStatus) ||
+      (input.runStatus === "running" && !input.pidAlive))
+  ) {
+    return { type: "idle" };
   }
   if (isActiveStatus(input.runStatus)) {
     return input.timeoutElapsed ? { type: "heartbeat" } : { type: "wait" };

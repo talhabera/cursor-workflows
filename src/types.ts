@@ -110,6 +110,7 @@ export type RunEvent =
       callIndex: number;
       key: string;
       ok: boolean;
+      cancelled?: boolean;
       tokens: number;
       phase?: string;
     }

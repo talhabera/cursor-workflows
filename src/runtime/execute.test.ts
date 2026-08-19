@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WorkflowLimitError } from "../errors.js";
 import { FakeWorkerBackend } from "../workers/fake.js";
 import type { ProgressSink } from "../progress.js";
+import type { RunEvent } from "../types.js";
 import { executeWorkflow } from "./execute.js";
 import { Journal } from "./journal.js";
 
@@ -134,6 +135,7 @@ return args.dir
 
   it("returns null for a cancelled phase without stopping the script", async () => {
     const cancelled = new Set<string>();
+    const events: RunEvent[] = [];
     let markStarted: () => void = () => undefined;
     const started = new Promise<void>((resolve) => {
       markStarted = resolve;
@@ -162,6 +164,7 @@ return { a, b, c }
         backend,
         concurrency: 2,
         shouldCancel: (call) => (call.phase ? cancelled.has(call.phase) : false),
+        progress: { emit: async (event) => void events.push(event) },
       }),
     );
     await started;
@@ -169,5 +172,8 @@ return { a, b, c }
     const executed = await run;
     expect(executed.result).toEqual({ a: { ok: "a" }, b: null, c: null });
     expect(backend.starts.some((s) => s.label === "c")).toBe(false);
+    expect(
+      events.filter((event) => event.type === "agent_end" && event.cancelled),
+    ).toHaveLength(2);
   });
 });

@@ -182,6 +182,44 @@ describe("selectWatchRun", () => {
     }
   });
 
+  it("does not select a completed dry-run with no agent events", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const id = "cw_dry";
+      await writeRun(cwd, record(cwd, id, "completed"));
+      await writeEvents(cwd, id, []);
+      expect(await selectWatchRun(cwd, { isPidAlive: () => false })).toBeUndefined();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not select a run awaiting approval", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const id = "cw_approval";
+      await writeRun(cwd, record(cwd, id, "awaiting_approval"));
+      await writeEvents(cwd, id, []);
+      expect(await selectWatchRun(cwd, { isPidAlive: () => false })).toBeUndefined();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("selects a running run", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const id = "cw_running";
+      await writeRun(cwd, record(cwd, id, "running"));
+      await writeEvents(cwd, id, [
+        { type: "agent_start", at: "t", callIndex: 1, key: "a", phase: "audit" },
+      ]);
+      expect(await selectWatchRun(cwd, { isPidAlive: () => true })).toBe(id);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("prefers a running run over an older fully consumed completed run", async () => {
     const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
     try {
@@ -199,6 +237,21 @@ describe("selectWatchRun", () => {
         { type: "agent_start", at: "t", callIndex: 1, key: "a", label: "a", phase: "audit" },
       ]);
       expect(await selectWatchRun(cwd, { isPidAlive: () => true })).toBe(active);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not select a consumed stale run with a dead pid", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "cw-"));
+    try {
+      const id = "cw_stale";
+      await writeRun(cwd, record(cwd, id, "running"));
+      await writeEvents(cwd, id, [
+        { type: "agent_start", at: "t", callIndex: 1, key: "a", phase: "audit" },
+      ]);
+      await writeWatchCursor(cwd, id, { phaseEnds: [], terminal: true });
+      expect(await selectWatchRun(cwd, { isPidAlive: () => false })).toBeUndefined();
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

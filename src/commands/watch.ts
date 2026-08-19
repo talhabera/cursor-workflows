@@ -140,6 +140,15 @@ export async function selectWatchRun(
   for (const run of runs) {
     const record = await readRun(cwd, run.id);
     const events = await readLastEvents(runFile(cwd, run.id, "events.ndjson"), Number.MAX_SAFE_INTEGER);
+    if (record.status === "awaiting_approval") {
+      continue;
+    }
+    if (
+      record.status === "completed" &&
+      !events.some((event) => event.type === "agent_start" || event.type === "agent_end")
+    ) {
+      continue;
+    }
     const cursor = await readWatchCursor(cwd, run.id);
     const state = reducePhaseMachine(events, record.status);
     const action = decideNotify({
@@ -157,8 +166,7 @@ export async function selectWatchRun(
     (run) =>
       run.status === "pending" ||
       run.status === "planning" ||
-      run.status === "running" ||
-      run.status === "awaiting_approval",
+      run.status === "running",
   );
   return (active ?? interesting[0])?.id;
 }

@@ -106,6 +106,7 @@ export async function executeWorkflow(
         callIndex: cancelledIndex,
         key,
         ok: false,
+        cancelled: true,
         tokens: 0,
         phase: callOptions.phase,
       });
@@ -149,13 +150,18 @@ export async function executeWorkflow(
     await semaphore.acquire();
     let cwd = callOptions.cwd ?? options.cwd;
     const callAbort = new AbortController();
+    let wholeRunStop: boolean = options.signal.aborted;
     if (options.signal.aborted) {
       callAbort.abort();
     }
-    const onParentAbort = (): void => callAbort.abort();
+    const onParentAbort = (): void => {
+      wholeRunStop = true;
+      callAbort.abort();
+    };
     options.signal.addEventListener("abort", onParentAbort, { once: true });
     const tick = async (): Promise<void> => {
       if (options.signal.aborted || (await options.shouldStop?.())) {
+        wholeRunStop = true;
         callAbort.abort();
         return;
       }
@@ -190,7 +196,7 @@ export async function executeWorkflow(
       });
 
       if (callAbort.signal.aborted) {
-        if (options.signal.aborted || (await options.shouldStop?.())) {
+        if (wholeRunStop || options.signal.aborted || (await options.shouldStop?.())) {
           throw new Error("workflow stopped");
         }
         const cancelledEntry: JournalEntry = {
@@ -208,6 +214,7 @@ export async function executeWorkflow(
           callIndex: thisIndex,
           key,
           ok: false,
+          cancelled: true,
           tokens: 0,
           phase: callOptions.phase,
         });
@@ -240,12 +247,17 @@ export async function executeWorkflow(
         callIndex: thisIndex,
         key,
         ok: result !== null,
+        cancelled: workerResult.status === "cancelled" ? true : undefined,
         tokens: workerResult.tokens,
         phase: callOptions.phase,
       });
       return result;
     } catch (error) {
-      if (options.signal.aborted || (error instanceof Error && error.message === "workflow stopped")) {
+      if (
+        wholeRunStop ||
+        options.signal.aborted ||
+        (error instanceof Error && error.message === "workflow stopped")
+      ) {
         throw error;
       }
       const completed: JournalEntry = {
@@ -263,6 +275,7 @@ export async function executeWorkflow(
         callIndex: thisIndex,
         key,
         ok: false,
+        cancelled: callAbort.signal.aborted ? true : undefined,
         tokens: 0,
         phase: callOptions.phase,
       });

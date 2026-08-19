@@ -65,6 +65,20 @@ describe("reducePhaseMachine", () => {
     expect(state.inFlight[0]?.phase).toBe("verify");
   });
 
+  it("completes an overlapping audit phase as soon as it drains", () => {
+    const events: RunEvent[] = [
+      start(1, "audit", "a"),
+      start(2, "audit", "b"),
+      end(1, "audit"),
+      start(3, "verify", "a"),
+      end(2, "audit"),
+    ];
+    const state = reducePhaseMachine(events, "running");
+    expect(state.completed.map((completion) => completion.phase)).toEqual(["audit"]);
+    expect(state.completed[0]).toMatchObject({ ok: 2, failed: 0, cancelled: 0 });
+    expect(state.frontier).toBe("verify");
+  });
+
   it("completes the last phase on terminal status", () => {
     const state = reducePhaseMachine(
       [start(1, "verify", "x"), end(1, "verify")],
@@ -89,6 +103,26 @@ describe("reducePhaseMachine", () => {
     ];
     const state = reducePhaseMachine(events, "completed");
     expect(state.completed.map((c) => c.phase)).toEqual(["audit", "verify", "audit"]);
+  });
+
+  it("counts cancelled agent ends separately from failures", () => {
+    const state = reducePhaseMachine(
+      [
+        start(1, "audit"),
+        {
+          type: "agent_end",
+          at: "t",
+          callIndex: 1,
+          key: "k1",
+          ok: false,
+          cancelled: true,
+          tokens: 0,
+          phase: "audit",
+        },
+      ],
+      "completed",
+    );
+    expect(state.completed[0]).toMatchObject({ ok: 0, failed: 0, cancelled: 1 });
   });
 });
 
@@ -166,6 +200,32 @@ describe("decideNotify", () => {
         state,
         cursor: { phaseEnds: ["audit"], terminal: true },
         runStatus: "completed",
+        pidAlive: false,
+        timeoutElapsed: true,
+      }).type,
+    ).toBe("idle");
+  });
+
+  it("returns idle after a stale running run has been consumed", () => {
+    const state = reducePhaseMachine([start(1, "audit")], running);
+    expect(
+      decideNotify({
+        state,
+        cursor: { phaseEnds: [], terminal: true },
+        runStatus: running,
+        pidAlive: false,
+        timeoutElapsed: true,
+      }).type,
+    ).toBe("idle");
+  });
+
+  it("returns idle while a run is awaiting approval", () => {
+    const state = reducePhaseMachine([], "awaiting_approval");
+    expect(
+      decideNotify({
+        state,
+        cursor: emptyCursor,
+        runStatus: "awaiting_approval",
         pidAlive: false,
         timeoutElapsed: true,
       }).type,
