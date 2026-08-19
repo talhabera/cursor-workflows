@@ -8,6 +8,7 @@ Commands:
   run         Generate and/or execute a workflow
   workflows   List or save reusable workflow scripts
   status      Show a run
+  watch        Wait for the next phase, heartbeat, or run end
   stop        Request stop for a running workflow
   resume      Resume a stopped or incomplete run
   help        Show help for a command
@@ -19,6 +20,7 @@ Examples:
   cw run --file .cursor/workflows/audit-routes.js
   cw workflows list
   cw status --run cw_k1_ab12
+  cw watch --run cw_k1_ab12
 `;
 
 export const CHAT_HELP = `cw chat — start an interactive Cursor agent session
@@ -107,4 +109,20 @@ Usage:
 
 Examples:
   cw resume --run cw_k1_ab12
+`;
+
+export const WATCH_HELP = `cw watch — wait for the next workflow phase or heartbeat
+
+Usage:
+  cw watch [--run <id>] [--timeout 300] [--output text|json]
+
+Options:
+  --run <id>              Run id (default: latest)
+  --timeout <seconds>     Wait this long for a phase end (default: 300; 0 waits forever)
+  --output <text|json>    stdout format (default: text)
+  -h, --help              Show this help
+
+Examples:
+  cw watch --run cw_k1_ab12
+  cw watch --run cw_k1_ab12 --timeout 300 --output json
 `;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIdFlags, parseRunFlags } from "./flags.js";
+import { parseIdFlags, parseRunFlags, parseWatchFlags } from "./flags.js";
 import { CliError } from "../errors.js";
 
 describe("parseRunFlags", () => {
@@ -56,6 +56,33 @@ describe("parseIdFlags", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(CliError);
       expect((error as CliError).example).toContain("cw stop --run <id> --phase verify");
+    }
+  });
+});
+
+describe("parseWatchFlags", () => {
+  it("defaults timeout to 300 and output to text", () => {
+    const flags = parseWatchFlags(["--run", "cw_1"]);
+    expect(flags.runId).toBe("cw_1");
+    expect(flags.timeout).toBe(300);
+    expect(flags.output).toBe("text");
+    expect(flags.help).toBe(false);
+  });
+
+  it("parses --timeout 0 and --output json", () => {
+    const flags = parseWatchFlags(["--timeout", "0", "--output", "json"]);
+    expect(flags.timeout).toBe(0);
+    expect(flags.output).toBe("json");
+    expect(flags.runId).toBeUndefined();
+  });
+
+  it("rejects a negative timeout", () => {
+    try {
+      parseWatchFlags(["--timeout", "-1"]);
+      throw new Error("expected CliError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliError);
+      expect((error as CliError).example).toContain("cw watch --timeout 300");
     }
   });
 });

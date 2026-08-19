@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_MAX_AGENTS,
+  DEFAULT_WATCH_TIMEOUT_SEC,
   HARD_MAX_AGENTS,
   MAX_CONCURRENCY,
 } from "../constants.js";
@@ -37,6 +38,13 @@ export interface IdFlags {
   user: boolean;
   phase: string | undefined;
   label: string | undefined;
+}
+
+export interface WatchFlags {
+  runId: string | undefined;
+  timeout: number;
+  output: OutputFormat;
+  help: boolean;
 }
 
 export function parseRunFlags(args: string[]): RunFlags {
@@ -145,6 +153,49 @@ export function parseIdFlags(args: string[]): IdFlags {
     user: values.user === true,
     phase: values.phase,
     label: values.label,
+  };
+}
+
+export function parseWatchFlags(args: string[]): WatchFlags {
+  const normalizedArgs = [...args];
+  for (let i = 0; i < normalizedArgs.length - 1; i++) {
+    if (normalizedArgs[i] === "--timeout" && normalizedArgs[i + 1]?.startsWith("-")) {
+      normalizedArgs[i] = `--timeout=${normalizedArgs[i + 1]}`;
+      normalizedArgs.splice(i + 1, 1);
+      break;
+    }
+  }
+  const { values } = parseArgs({
+    args: normalizedArgs,
+    allowPositionals: true,
+    options: {
+      run: { type: "string" },
+      timeout: { type: "string" },
+      output: { type: "string", default: "text" },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  const outputRaw = values.output ?? "text";
+  if (!isOutputFormat(outputRaw)) {
+    throw new CliError(`unknown output format: ${outputRaw}`, {
+      example: "cw watch --output json",
+    });
+  }
+  let timeout = DEFAULT_WATCH_TIMEOUT_SEC;
+  if (values.timeout !== undefined) {
+    const value = Number(values.timeout);
+    if (!Number.isInteger(value) || value < 0 || value > 86400) {
+      throw new CliError("--timeout must be an integer between 0 and 86400", {
+        example: "cw watch --timeout 300 --run <id>",
+      });
+    }
+    timeout = value;
+  }
+  return {
+    runId: values.run,
+    timeout,
+    output: outputRaw,
+    help: values.help === true,
   };
 }
 
