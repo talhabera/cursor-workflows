@@ -88,6 +88,13 @@ export interface RunRecord {
   tokens: number;
 }
 
+export type WatchReason = "phase_end" | "heartbeat" | "terminal" | "stale";
+
+export interface WatchCursor {
+  phaseEnds: string[];
+  terminal: boolean;
+}
+
 export type RunEvent =
   | {
       type: "agent_start";
