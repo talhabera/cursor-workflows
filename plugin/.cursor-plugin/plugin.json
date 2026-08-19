@@ -4,5 +4,6 @@
   "version": "0.1.0",
   "description": "Ultracode-style workflow orchestration for the Cursor agent CLI.",
   "license": "MIT",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
 }
