@@ -65,6 +65,25 @@ describe("reducePhaseMachine", () => {
     expect(state.inFlight[0]?.phase).toBe("verify");
   });
 
+  it("does not complete the frontier phase between sequential same-phase calls", () => {
+    const events: RunEvent[] = [
+      start(1, "audit"),
+      start(2, "verify"),
+      end(1, "audit"),
+      end(2, "verify"),
+      start(3, "verify"),
+    ];
+    const running = reducePhaseMachine(events, "running");
+    expect(running.completed.map((c) => c.phase)).toEqual(["audit"]);
+    expect(running.frontier).toBe("verify");
+    const done = reducePhaseMachine(
+      [...events, end(3, "verify")],
+      "completed",
+    );
+    expect(done.completed.map((c) => c.phase)).toEqual(["audit", "verify"]);
+    expect(done.completed[1]?.ok).toBe(2);
+  });
+
   it("completes an overlapping audit phase as soon as it drains", () => {
     const events: RunEvent[] = [
       start(1, "audit", "a"),

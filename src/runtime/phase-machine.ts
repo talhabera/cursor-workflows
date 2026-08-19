@@ -94,7 +94,7 @@ export function reducePhaseMachine(events: RunEvent[], runStatus: RunStatus): Ph
       return;
     }
     for (const phase of [...startOrder]) {
-      if (runningCount(phase) === 0) {
+      if (phase !== frontier && runningCount(phase) === 0) {
         complete(phase);
       }
     }
