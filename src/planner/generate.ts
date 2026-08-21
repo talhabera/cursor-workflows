@@ -1,115 +1,64 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Agent, CursorAgentError, type SDKCustomToolResult, type SDKJsonValue } from "@cursor/sdk";
 import { DEFAULT_MODEL } from "../constants.js";
 import { CliError } from "../errors.js";
 import { assertScriptAllowed } from "../runtime/sandbox.js";
-import type { WorkflowSize } from "../types.js";
+import type { WorkerBackend, WorkflowSize } from "../types.js";
 import { assertNever } from "../util/assert-never.js";
-import { sdkToolConfig } from "../workers/tools.js";
+
+export const PLANNER_SOURCE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  required: ["source"],
+  properties: {
+    source: { type: "string", description: "Full JavaScript workflow source" },
+  },
+};
 
 export interface PlanWorkflowOptions {
   task: string;
   cwd: string;
   model?: string;
   size: WorkflowSize;
-  apiKey: string;
+  backend: WorkerBackend;
+  signal?: AbortSignal;
 }
 
 export async function planWorkflow(options: PlanWorkflowOptions): Promise<string> {
   const prompt = await renderPlannerPrompt(options.task, options.size);
-  let submitted: string | undefined;
-  const toolConfig = sdkToolConfig("read");
-
-  try {
-    await using agent = await Agent.create({
-      apiKey: options.apiKey,
-      model: { id: options.model ?? DEFAULT_MODEL },
-      ...(toolConfig.tools ? { tools: toolConfig.tools } : {}),
-      ...(toolConfig.disallowedTools ? { disallowedTools: toolConfig.disallowedTools } : {}),
-      local: {
-        cwd: options.cwd,
-        customTools: {
-          submit_workflow: {
-            description:
-              "Submit the complete workflow.js source. Call this once when the script is ready. Do not implement the user task yourself.",
-            inputSchema: {
-              type: "object",
-              required: ["source"],
-              properties: {
-                source: {
-                  type: "string",
-                  description: "Full JavaScript workflow source with export const meta and top-level await",
-                },
-              },
-            },
-            execute: (args: Record<string, SDKJsonValue>): SDKCustomToolResult => {
-              const source = args.source;
-              if (typeof source !== "string" || !source.trim()) {
-                return {
-                  content: [{ type: "text", text: "source must be a non-empty string" }],
-                  isError: true,
-                };
-              }
-              try {
-                assertScriptAllowed(source);
-              } catch (error) {
-                return {
-                  content: [
-                    {
-                      type: "text",
-                      text: error instanceof Error ? error.message : String(error),
-                    },
-                  ],
-                  isError: true,
-                };
-              }
-              submitted = source.trim();
-              return "ok";
-            },
-          },
-        },
-      },
+  const workerResult = await options.backend.start({
+    prompt,
+    cwd: options.cwd,
+    model: options.model ?? DEFAULT_MODEL,
+    tools: "read",
+    cliMode: "plan",
+    schema: undefined,
+    label: "planner",
+    phase: "plan",
+    isolation: "cwd",
+    signal: options.signal ?? new AbortController().signal,
+  });
+  const source = sourceFromResult(workerResult.result);
+  if (!source || workerResult.status !== "finished") {
+    throw new CliError("planner finished without producing a workflow script", {
+      example: "cw run --file examples/audit-routes.js --yes",
     });
-
-    const run = await agent.send(prompt);
-    const result = await run.wait();
-
-    switch (result.status) {
-      case "finished": {
-        const source = submitted ?? extractSourceFromText(result.result ?? "");
-        if (!source) {
-          throw new CliError("planner finished without producing a workflow script", {
-            example: "cw run --file examples/audit-routes.js --yes",
-          });
-        }
-        assertScriptAllowed(source);
-        return source;
-      }
-      case "error":
-        throw new CliError(`planner run failed: ${result.error?.message ?? result.id}`, {
-          exitCode: 2,
-          example: "cw run --file examples/audit-routes.js --yes",
-        });
-      case "cancelled":
-        throw new CliError("planner run was cancelled", { exitCode: 2 });
-      default: {
-        const _exhaustive: never = result.status;
-        throw new Error(`unexpected planner status: ${_exhaustive}`);
-      }
-    }
-  } catch (error) {
-    if (error instanceof CliError) {
-      throw error;
-    }
-    if (error instanceof CursorAgentError) {
-      throw new CliError(`planner failed to start: ${error.message}`, {
-        example: 'export CURSOR_API_KEY="cursor_..." && cw run "your task" --yes',
-      });
-    }
-    throw error;
   }
+  assertScriptAllowed(source);
+  return source;
+}
+
+function sourceFromResult(result: unknown): string | undefined {
+  if (result && typeof result === "object" && "source" in result) {
+    const source = (result as { source: unknown }).source;
+    if (typeof source === "string" && source.trim()) {
+      return source.trim();
+    }
+  }
+  if (typeof result === "string") {
+    return extractSourceFromText(result);
+  }
+  return undefined;
 }
 
 export async function renderPlannerPrompt(task: string, size: WorkflowSize): Promise<string> {

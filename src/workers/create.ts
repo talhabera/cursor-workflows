@@ -16,19 +16,22 @@ export function createWorkerBackend(name: WorkerBackendName): WorkerBackend {
         defaultModel: DEFAULT_MODEL,
       });
     case "cli":
-      return new CliWorkerBackend({ defaultModel: DEFAULT_MODEL });
+      return new CliWorkerBackend({
+        defaultModel: DEFAULT_MODEL,
+        agentBin: process.env.CW_AGENT_BIN?.trim() || undefined,
+      });
     default:
       return assertNever(name);
   }
 }
 
 export function requireApiKey(backend: WorkerBackendName): void {
-  if (backend === "fake") {
+  if (backend !== "sdk") {
     return;
   }
   if (!process.env.CURSOR_API_KEY?.trim()) {
     throw new CliError("CURSOR_API_KEY is not set", {
-      example: 'export CURSOR_API_KEY="cursor_..." && cw run --file workflow.js --yes',
+      example: 'export CURSOR_API_KEY="cursor_..." && cw run --backend sdk --file workflow.js --yes',
     });
   }
 }

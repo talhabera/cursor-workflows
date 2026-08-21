@@ -64,7 +64,20 @@ export class SdkWorkerBackend implements WorkerBackend {
         : `${request.prompt}\n\nWhen finished, call submit_result with your structured answer.`;
 
       const run = await agent.send(prompt);
-      const result = await run.wait();
+      const onAbort = (): void => {
+        void run.cancel();
+      };
+      if (request.signal.aborted) {
+        onAbort();
+      } else {
+        request.signal.addEventListener("abort", onAbort);
+      }
+      let result: Awaited<ReturnType<typeof run.wait>>;
+      try {
+        result = await run.wait();
+      } finally {
+        request.signal.removeEventListener("abort", onAbort);
+      }
 
       switch (result.status) {
         case "finished": {

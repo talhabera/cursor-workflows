@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_MAX_AGENTS,
+  DEFAULT_WATCH_TIMEOUT_SEC,
   HARD_MAX_AGENTS,
   MAX_CONCURRENCY,
 } from "../constants.js";
@@ -17,6 +18,7 @@ export interface RunFlags {
   dryRun: boolean;
   yes: boolean;
   save: boolean;
+  detach: boolean;
   backend: WorkerBackendName;
   cwd: string;
   model: string | undefined;
@@ -34,6 +36,15 @@ export interface IdFlags {
   yes: boolean;
   name: string | undefined;
   user: boolean;
+  phase: string | undefined;
+  label: string | undefined;
+}
+
+export interface WatchFlags {
+  runId: string | undefined;
+  timeout: number;
+  output: OutputFormat;
+  help: boolean;
 }
 
 export function parseRunFlags(args: string[]): RunFlags {
@@ -47,7 +58,8 @@ export function parseRunFlags(args: string[]): RunFlags {
       "dry-run": { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
       save: { type: "boolean", default: false },
-      backend: { type: "string", default: "sdk" },
+      detach: { type: "boolean", default: false },
+      backend: { type: "string", default: "cli" },
       cwd: { type: "string" },
       model: { type: "string" },
       size: { type: "string", default: "medium" },
@@ -58,10 +70,10 @@ export function parseRunFlags(args: string[]): RunFlags {
     },
   });
 
-  const backendRaw = values.backend ?? "sdk";
+  const backendRaw = values.backend ?? "cli";
   if (!isWorkerBackendName(backendRaw)) {
     throw new CliError(`unknown backend: ${backendRaw}`, {
-      example: "cw run --backend sdk --file workflow.js --yes",
+      example: "cw run --backend cli --file workflow.js --yes",
     });
   }
   const sizeRaw = values.size ?? "medium";
@@ -85,6 +97,7 @@ export function parseRunFlags(args: string[]): RunFlags {
     dryRun: values["dry-run"] === true,
     yes: values.yes === true,
     save: values.save === true,
+    detach: values.detach === true,
     backend: backendRaw,
     cwd: values.cwd ?? process.cwd(),
     model: values.model,
@@ -118,6 +131,8 @@ export function parseIdFlags(args: string[]): IdFlags {
       yes: { type: "boolean", default: false },
       name: { type: "string" },
       user: { type: "boolean", default: false },
+      phase: { type: "string" },
+      label: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -127,6 +142,8 @@ export function parseIdFlags(args: string[]): IdFlags {
       example: "cw status --output json",
     });
   }
+  assertNonEmptySelector("--phase", values.phase);
+  assertNonEmptySelector("--label", values.label);
   return {
     runId: values.run,
     output: outputRaw,
@@ -134,7 +151,60 @@ export function parseIdFlags(args: string[]): IdFlags {
     yes: values.yes === true,
     name: values.name,
     user: values.user === true,
+    phase: values.phase,
+    label: values.label,
   };
+}
+
+export function parseWatchFlags(args: string[]): WatchFlags {
+  const normalizedArgs = [...args];
+  for (let i = 0; i < normalizedArgs.length - 1; i++) {
+    if (normalizedArgs[i] === "--timeout" && normalizedArgs[i + 1]?.startsWith("-")) {
+      normalizedArgs[i] = `--timeout=${normalizedArgs[i + 1]}`;
+      normalizedArgs.splice(i + 1, 1);
+      break;
+    }
+  }
+  const { values } = parseArgs({
+    args: normalizedArgs,
+    allowPositionals: true,
+    options: {
+      run: { type: "string" },
+      timeout: { type: "string" },
+      output: { type: "string", default: "text" },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  const outputRaw = values.output ?? "text";
+  if (!isOutputFormat(outputRaw)) {
+    throw new CliError(`unknown output format: ${outputRaw}`, {
+      example: "cw watch --output json",
+    });
+  }
+  let timeout = DEFAULT_WATCH_TIMEOUT_SEC;
+  if (values.timeout !== undefined) {
+    const value = Number(values.timeout);
+    if (!Number.isInteger(value) || value < 0 || value > 86400) {
+      throw new CliError("--timeout must be an integer between 0 and 86400", {
+        example: "cw watch --timeout 300 --run <id>",
+      });
+    }
+    timeout = value;
+  }
+  return {
+    runId: values.run,
+    timeout,
+    output: outputRaw,
+    help: values.help === true,
+  };
+}
+
+function assertNonEmptySelector(flag: "--phase" | "--label", value: string | undefined): void {
+  if (value !== undefined && value.trim() === "") {
+    throw new CliError(`${flag} must not be empty`, {
+      example: "cw stop --run <id> --phase verify",
+    });
+  }
 }
 
 function parseArgsJson(raw: string | undefined): unknown {

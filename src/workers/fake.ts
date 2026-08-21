@@ -25,6 +25,15 @@ export class FakeWorkerBackend implements WorkerBackend {
     this.maxConcurrent = Math.max(this.maxConcurrent, this.inFlight);
     try {
       const result = await this.handler(request);
+      if (request.signal.aborted) {
+        return {
+          id: `fake-${this.starts.length}`,
+          result: null,
+          tokens: 0,
+          transcriptPath: undefined,
+          status: "cancelled",
+        };
+      }
       return {
         id: `fake-${this.starts.length}`,
         result,

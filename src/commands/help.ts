@@ -4,18 +4,37 @@ Usage:
   cw <command> [options]
 
 Commands:
+  chat        Start an interactive Cursor agent session
   run         Generate and/or execute a workflow
   workflows   List or save reusable workflow scripts
   status      Show a run
+  watch        Wait for the next phase, heartbeat, or run end
   stop        Request stop for a running workflow
   resume      Resume a stopped or incomplete run
   help        Show help for a command
 
 Examples:
+  cw
+  cw chat
   cw run "audit every route under src/routes for missing auth" --yes
   cw run --file .cursor/workflows/audit-routes.js
   cw workflows list
   cw status --run cw_k1_ab12
+  cw watch --run cw_k1_ab12
+`;
+
+export const CHAT_HELP = `cw chat — start an interactive Cursor agent session
+
+Usage:
+  cw chat [agent-options...]
+
+Options:
+  -h, --help              Show this help
+
+Examples:
+  cw
+  cw chat
+  cw chat --model composer-2.5
 `;
 
 export const RUN_HELP = `cw run — generate and execute a workflow
@@ -28,10 +47,11 @@ Options:
   --workflow <name>       Load .cursor/workflows/<name>.js (project wins over user)
   --args <json>           Structured input exposed as \`args\` in the script
   --dry-run               Write/print the script and exit without executing
+  --detach                Start the runtime in the background (cw resume --run <id>)
   --yes                   Execute a planner-generated script without a second confirmation
   --save                  After a successful run, copy the script to .cursor/workflows/
   --backend <sdk|cli|fake>
-                          Worker backend (default: sdk)
+                          Worker backend (default: cli)
   --cwd <path>            Workspace root (default: current directory)
   --model <id>            Default model for planner and workers
   --size <small|medium|large|unrestricted>
@@ -42,10 +62,12 @@ Options:
   -h, --help              Show this help
 
 Examples:
+  agent login && cw run --file workflow.js --detach
   cw run "audit every route under src/routes for missing auth" --yes
   cw run --file examples/audit-routes.js --backend fake --yes
   cw run --workflow audit-routes --args '{"dir":"src/routes"}'
   cw run "migrate styled-components to Tailwind" --dry-run
+  cw run --file .cursor/workflows/audit-routes.js --detach
 `;
 
 export const WORKFLOWS_HELP = `cw workflows — saved workflow scripts
@@ -72,10 +94,12 @@ Examples:
 export const STOP_HELP = `cw stop — request stop for a running workflow
 
 Usage:
-  cw stop [--run <id>]
+  cw stop [--run <id>] [--phase <name>] [--label <label>]
 
 Examples:
   cw stop --run cw_k1_ab12
+  cw stop --run cw_k1_ab12 --phase verify
+  cw stop --run cw_k1_ab12 --label src/routes/a.ts
 `;
 
 export const RESUME_HELP = `cw resume — replay completed agent() calls and continue the rest
@@ -85,4 +109,20 @@ Usage:
 
 Examples:
   cw resume --run cw_k1_ab12
+`;
+
+export const WATCH_HELP = `cw watch — wait for the next workflow phase or heartbeat
+
+Usage:
+  cw watch [--run <id>] [--timeout 300] [--output text|json]
+
+Options:
+  --run <id>              Run id (default: latest)
+  --timeout <seconds>     Wait this long for a phase end (default: 300; 0 waits forever)
+  --output <text|json>    stdout format (default: text)
+  -h, --help              Show this help
+
+Examples:
+  cw watch --run cw_k1_ab12
+  cw watch --run cw_k1_ab12 --timeout 300 --output json
 `;

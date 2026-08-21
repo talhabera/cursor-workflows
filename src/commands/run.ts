@@ -6,6 +6,7 @@ import { planWorkflow } from "../planner/generate.js";
 import { createProgressSink } from "../progress.js";
 import { executeWorkflow } from "../runtime/execute.js";
 import { Journal } from "../runtime/journal.js";
+import { spawnDetachedResume } from "../runtime/detach.js";
 import { parseRunFlags } from "../cli/flags.js";
 import { RUN_HELP } from "./help.js";
 import { runFile } from "../store/paths.js";
@@ -19,7 +20,11 @@ export interface CommandIo {
   stderr: { write(chunk: string): unknown; isTTY?: boolean };
 }
 
-export async function runCommand(argv: string[], io: CommandIo = process): Promise<number> {
+export async function runCommand(
+  argv: string[],
+  io: CommandIo = process,
+  hooks: { spawnResume?: typeof spawnDetachedResume } = {},
+): Promise<number> {
   const flags = parseRunFlags(argv);
   if (flags.help) {
     io.stdout.write(`${RUN_HELP}\n`);
@@ -38,6 +43,11 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
       example: "cw run --file .cursor/workflows/audit-routes.js",
     });
   }
+  if (flags.save && flags.detach) {
+    throw new CliError("cannot use --save with --detach", {
+      example: "cw workflows save --run <id>",
+    });
+  }
 
   const runId = newRunId();
   const createdAt = new Date().toISOString();
@@ -51,6 +61,8 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
     updatedAt: createdAt,
     pid: process.pid,
     stopRequested: false,
+    cancelPhases: [],
+    cancelLabels: [],
     workflowPath: runFile(cwd, runId, "workflow.js"),
     prompt: flags.prompt,
     args: flags.args,
@@ -71,22 +83,19 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
     } else if (flags.workflow) {
       source = await loadWorkflowByName(cwd, flags.workflow);
     } else {
-      if (flags.backend !== "fake") {
-        requireApiKey("sdk");
-      }
+      requireApiKey(flags.backend);
       if (!flags.prompt) {
         throw new CliError("planner requires a prompt", {
           example: 'cw run "audit src/routes for missing auth" --yes',
         });
       }
       await updateRun(cwd, runId, { status: "planning" });
-      const apiKey = process.env.CURSOR_API_KEY?.trim() ?? "";
       source = await planWorkflow({
         task: flags.prompt,
         cwd,
         model: flags.model,
         size: flags.size,
-        apiKey,
+        backend: createWorkerBackend(flags.backend),
       });
     }
   } catch (error) {
@@ -120,6 +129,34 @@ export async function runCommand(argv: string[], io: CommandIo = process): Promi
 
   if (flags.backend !== "fake") {
     requireApiKey(flags.backend);
+  }
+
+  if (flags.detach) {
+    await updateRun(cwd, runId, { status: "pending", workflowPath, pid: undefined });
+    try {
+      const logPath = runFile(cwd, runId, "runtime.log");
+      const spawned = (hooks.spawnResume ?? spawnDetachedResume)({
+        cwd,
+        runId,
+        output: flags.output,
+        logPath,
+        onError: (spawnError) => {
+          void updateRun(cwd, runId, {
+            status: "failed",
+            error: spawnError.message,
+          });
+        },
+      });
+      await updateRun(cwd, runId, { pid: spawned.pid });
+    } catch (error) {
+      await updateRun(cwd, runId, {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    io.stderr.write(`run: ${runId}\nworkflow: ${workflowPath}\n`);
+    return 0;
   }
 
   return executeExistingRun({
@@ -190,6 +227,19 @@ export async function executeExistingRun(options: {
         try {
           const current = await readRun(options.cwd, options.runId);
           return current.stopRequested;
+        } catch {
+          return false;
+        }
+      },
+      shouldCancel: async (call) => {
+        try {
+          const current = await readRun(options.cwd, options.runId);
+          const phases = current.cancelPhases ?? [];
+          const labels = current.cancelLabels ?? [];
+          return (
+            (call.phase !== undefined && phases.includes(call.phase)) ||
+            (call.label !== undefined && labels.includes(call.label))
+          );
         } catch {
           return false;
         }

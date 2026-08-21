@@ -14,6 +14,7 @@
   },
   "files": [
     "dist",
+    "plugin",
     "src/planner/prompts"
   ],
   "engines": {

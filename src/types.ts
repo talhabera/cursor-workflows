@@ -37,6 +37,7 @@ export interface WorkerRequest {
   phase: string | undefined;
   isolation: IsolationMode;
   signal: AbortSignal;
+  cliMode?: "ask" | "plan";
 }
 
 export interface WorkerResult {
@@ -74,6 +75,8 @@ export interface RunRecord {
   updatedAt: string;
   pid: number | undefined;
   stopRequested: boolean;
+  cancelPhases: string[];
+  cancelLabels: string[];
   workflowPath: string;
   prompt: string | undefined;
   args: unknown;
@@ -83,6 +86,13 @@ export interface RunRecord {
   error: string | undefined;
   agentCount: number;
   tokens: number;
+}
+
+export type WatchReason = "phase_end" | "heartbeat" | "terminal" | "stale";
+
+export interface WatchCursor {
+  phaseEnds: string[];
+  terminal: boolean;
 }
 
 export type RunEvent =
@@ -100,6 +110,7 @@ export type RunEvent =
       callIndex: number;
       key: string;
       ok: boolean;
+      cancelled?: boolean;
       tokens: number;
       phase?: string;
     }

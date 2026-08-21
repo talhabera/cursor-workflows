@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WorkflowLimitError } from "../errors.js";
 import { FakeWorkerBackend } from "../workers/fake.js";
 import type { ProgressSink } from "../progress.js";
+import type { RunEvent } from "../types.js";
 import { executeWorkflow } from "./execute.js";
 import { Journal } from "./journal.js";
 
@@ -130,5 +131,49 @@ return args.dir
 `;
     const executed = await executeWorkflow(runOptions({ source, args: { dir: "src/routes" } }));
     expect(executed.result).toBe("src/routes");
+  });
+
+  it("returns null for a cancelled phase without stopping the script", async () => {
+    const cancelled = new Set<string>();
+    const events: RunEvent[] = [];
+    let markStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const backend = new FakeWorkerBackend(async (request) => {
+      if (request.phase === "verify" && request.label === "b") {
+        markStarted();
+        await new Promise<void>((resolve) => {
+          request.signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        return { skipped: true };
+      }
+      return { ok: request.label };
+    });
+    const source = `
+export const meta = { name: "cancel", description: "cancel" }
+const a = await agent("keep", { label: "a", phase: "work" })
+const bP = agent("drop", { label: "b", phase: "verify" })
+const b = await bP
+const c = await agent("after", { label: "c", phase: "verify" })
+return { a, b, c }
+`;
+    const run = executeWorkflow(
+      runOptions({
+        source,
+        backend,
+        concurrency: 2,
+        shouldCancel: (call) => (call.phase ? cancelled.has(call.phase) : false),
+        progress: { emit: async (event) => void events.push(event) },
+      }),
+    );
+    await started;
+    cancelled.add("verify");
+    const executed = await run;
+    expect(executed.result).toEqual({ a: { ok: "a" }, b: null, c: null });
+    expect(backend.starts.some((s) => s.label === "c")).toBe(false);
+    expect(
+      events.filter((event) => event.type === "agent_end" && event.cancelled),
+    ).toHaveLength(2);
   });
 });
